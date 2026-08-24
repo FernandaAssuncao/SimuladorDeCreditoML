@@ -108,12 +108,12 @@ class InterfaceSimuladorImprestimo(ctk.CTk):
                 probabilidade = self.ia.calcular_probabilidade_aprovado(idade, salario, valor, percentual_renda, historico_inadimplencia)
                 cliente.status = 'aprovado'
                 cor = '#7FFFD4'
-                texto = f'Parabéns, o Empréstimo no valor de R${cliente.valor_solicitado:.2f}\n foi {cliente.status}. Probabilidade de aprovação estimada {probabilidade * 100:.2f}%'
+                texto = f'Parabéns, o Empréstimo no valor de\n R${cliente.valor_solicitado:.2f} foi {cliente.status}.\n Probabilidade de aprovação estimada {probabilidade * 100:.2f}%'
             else:
                 probabilidade = self.ia.calcular_probabilidade_reprovado(idade, salario, valor, percentual_renda, historico_inadimplencia)
                 cliente.status = 'reprovado'
                 cor = '#9B111E'
-                texto = f'Sinto muito, o Empréstimo no valor de R${cliente.valor_solicitado:.2f}\n foi {cliente.status}. Probabilidade de reprovação estimada {probabilidade* 100:.2f}%'
+                texto = f'Sinto muito, o Empréstimo no valor de\n R${cliente.valor_solicitado:.2f} foi {cliente.status}.\n Probabilidade de reprovação estimada {probabilidade* 100:.2f}%'
             self.resposta.configure(text=texto, text_color=cor)
             self.campo_idade.configure(border_color=cor)
             self.campo_salario.configure(border_color=cor)

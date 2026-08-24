@@ -37,4 +37,4 @@ Dados utilizados no projeto são do Kaggle.
 ## 🖼️ Demonstração da Interface
 
 | Empréstimo Reprovado | Empréstimo Aprovado |
-| ![Reprovado](assets/emprestimoreprovado.png) | ![Aprovado](assets/emprestimoaprovado.png) |
+| ![Reprovado](assets/image.jpg) | ![Aprovado](assets/) |

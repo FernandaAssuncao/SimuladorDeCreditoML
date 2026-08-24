@@ -58,7 +58,7 @@ class IAFinanceira:
     def prever(self, idade:int, salario:float, valor:float, porcentual_renda:float, nome_limpo:int):
         dados_clientes = pd.DataFrame([[idade, salario, valor, porcentual_renda, nome_limpo]], columns=self.colunas_x)
         resultado = self.__modelo.predict(dados_clientes)
-        return resultado[0] == 0 #Retorna 0 se for aprovado.
+        return resultado[0] == 0 #Se for 0 retorna true (aprovado).
 
     def __salvar_modelo(self):
         joblib.dump(self.__modelo, self.nome_arquivo)
