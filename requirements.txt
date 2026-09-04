@@ -2,3 +2,6 @@ pandas
 scikit-learn
 customtkinter
 joblib
+matplotlib
+
+numpy

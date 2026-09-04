@@ -1,9 +1,11 @@
 import os
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, recall_score, f1_score, classification_report, precision_recall_curve
 import pandas as pd
 import joblib
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class IAFinanceira:
@@ -15,6 +17,7 @@ class IAFinanceira:
         self.__modelo = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
         self.__treinada = False
         self.verificar()
+        self.testar_modelo()
 
     def __treinar_ia(self):
         df = pd.read_csv('data/credit_risk_dataset.csv')
@@ -50,8 +53,16 @@ class IAFinanceira:
         previsoes = self.__modelo.predict(x_test)
         accuracy = accuracy_score(y_test, previsoes)
         matriz = confusion_matrix(y_test, previsoes)
+        precision = precision_score(y_test, previsoes)
+        recall = recall_score(y_test, previsoes)
+        classification = classification_report(y_test, previsoes)
+        f1 = f1_score(y_test, previsoes)
         print(f'Accuracy do modelo: {accuracy:.4f}%')
-        print(f'Matriz confusion modelo: {matriz}')
+        print(f'Matriz confusion modelo: {matriz}%')
+        print(f'Precision: {precision:.4f}%')
+        print(f'Recall: {recall:.4f}%')
+        print(f'F1 score: {f1:.4f}%')
+        print(f'Classification report: {classification}')
 
         self.__salvar_modelo()
 
@@ -84,7 +95,71 @@ class IAFinanceira:
         return resultado[0][1]
 
     def testar_modelo(self):
-        pass
+        df = pd.read_csv('data/credit_risk_dataset.csv')
+        colunas_selecionadas = [
+            'person_age',
+            'person_income',
+            'loan_amnt',
+            'loan_percent_income',
+            'cb_person_default_on_file',
+            'loan_status'
+        ]
+        df_filtrado = df[colunas_selecionadas].copy()
+        df_filtrado = df_filtrado.dropna()
+        df_filtrado['cb_person_default_on_file'] = df_filtrado['cb_person_default_on_file'].map({'Y': 1, 'N': 0})
+        x = df_filtrado[['person_age', 'person_income', 'loan_amnt', 'loan_percent_income', 'cb_person_default_on_file']]
+        y = df_filtrado['loan_status']
+        x_treino, x_test, y_treino, y_test = train_test_split(x, y,
+                                                              test_size=0.2,
+                                                              random_state=42,
+                                                              stratify=y)
+        modelo = RandomForestClassifier(n_estimators=100, max_depth=10,
+                                        random_state=42, class_weight='balanced')
+        modelos = {'Modelo': self.__modelo, 'Modelo classe': modelo}
+        resultados = []
+        for nome, m in modelos.items():
+            if nome == 'Modelo classe':
+                m.fit(x_treino, y_treino)
+            print(f'{nome}')
+            previsoes = m.predict(x_test)
+            probabilidades = m.predict_proba(x_test)
+            if nome == 'Modelo':
+                probabilidade_classe_1 = probabilidades[:, 1]
+                for threshold in [0.5, 0.4, 0.3, 0.2, 0.1]:
+                    previsoes_thansbord = (probabilidade_classe_1 >= threshold).astype(int)
+                    resultados.append({
+                        'Threshold': threshold,
+                        'precision': precision_score(y_test, previsoes_thansbord),
+                        'recall': recall_score(y_test, previsoes_thansbord),
+                        'f1': f1_score(y_test, previsoes_thansbord),
+                    })
+                precision, recall, thresholds = precision_recall_curve(y_test,probabilidade_classe_1)
+                plt.plot(recall, precision)
+                plt.xlabel('Recall')
+                plt.ylabel('Precision')
+                plt.title('Precision Recall Curve')
+                plt.show()
+                print(f'precision: {precision}')
+                print(f'recall: {recall}')
+                print(f'thresholds: {thresholds}')
+                f1_scores = 2 * (precision[:-1] * recall[:-1]) / (
+                        precision[:-1] + recall[:-1]
+                )
+                melhor_f1_scores = np.argmax(f1_scores)
+                melhor_threshold = thresholds[melhor_f1_scores]
+                melhor_f1 = f1_scores[melhor_f1_scores]
+                print(f'Melhor Threshold: {melhor_threshold}')
+                print(f'Melhor F1 Score: {melhor_f1}')
+                previsoes_classe_threshold = (probabilidade_classe_1 >= melhor_threshold).astype(int)
+                print(f'Matriz confusion: {confusion_matrix(y_test, previsoes_classe_threshold)}')
+                print(f'Classification report: {classification_report(y_test, previsoes_classe_threshold)}')
+            #print(f'Accuracy: {accuracy_score(y_test, previsoes):.4f}%')
+            #print(f'Matrix de confusão: {confusion_matrix(y_test, previsoes)}')
+            #print(f'Precision score: {precision_score(y_test, previsoes)}')
+            #print(f'Recall score: {recall_score(y_test, previsoes)}')
+            #print(f'F1 score: {f1_score(y_test, previsoes)}')
+            #print(f'Classification report: {classification_report(y_test, previsoes)}')
+            print('=' * 30)
 
     def __atualizar_treinamento_da_ia(self):
         self.__treinar_ia()
