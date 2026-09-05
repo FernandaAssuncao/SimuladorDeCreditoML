@@ -163,3 +163,4 @@ class IAFinanceira:
 
     def __atualizar_treinamento_da_ia(self):
         self.__treinar_ia()
+
