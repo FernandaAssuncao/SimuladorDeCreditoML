@@ -2,6 +2,8 @@ import os
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, recall_score, f1_score, classification_report, precision_recall_curve
+from sklearn.metrics import roc_curve, roc_auc_score
+from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
 import pandas as pd
 import joblib
 import matplotlib.pyplot as plt
@@ -109,6 +111,7 @@ class IAFinanceira:
         df_filtrado['cb_person_default_on_file'] = df_filtrado['cb_person_default_on_file'].map({'Y': 1, 'N': 0})
         x = df_filtrado[['person_age', 'person_income', 'loan_amnt', 'loan_percent_income', 'cb_person_default_on_file']]
         y = df_filtrado['loan_status']
+        self.__testando_grid(x, y)
         x_treino, x_test, y_treino, y_test = train_test_split(x, y,
                                                               test_size=0.2,
                                                               random_state=42,
@@ -153,6 +156,31 @@ class IAFinanceira:
                 previsoes_classe_threshold = (probabilidade_classe_1 >= melhor_threshold).astype(int)
                 print(f'Matriz confusion: {confusion_matrix(y_test, previsoes_classe_threshold)}')
                 print(f'Classification report: {classification_report(y_test, previsoes_classe_threshold)}')
+                fpr, tpr, thresholds_roc = roc_curve(y_test, probabilidade_classe_1)
+                auc = roc_auc_score(y_test, probabilidade_classe_1)
+                print(f'FPR: {fpr[:10]}')
+                print(f'TPR: {tpr[:10]}')
+                print(f'Thresholds: {thresholds_roc[:10]}')
+                print(f'AUC: {auc}')
+                score = cross_val_score(self.__modelo, x, y, cv=5, scoring='accuracy')
+                print(f'Score: {score}')
+                print(f'Média: {score.mean()}')
+                resultadoss = cross_validate(self.__modelo,
+                                             x,
+                                             y,
+                                             cv=5,
+                                             scoring=[
+                                                 'accuracy',
+                                                 'precision',
+                                                 'recall',
+                                                 'f1',
+                                                 'roc_auc'
+                                             ])
+                print('Accuracy média:', resultadoss['test_accuracy'].mean())
+                print(f'Medía precision: {resultadoss["test_precision"].mean()}')
+                print(f'Medía recall: {resultadoss["test_recall"].mean()}')
+                print(f'Medía F1 score: {resultadoss["test_f1"].mean()}')
+                print(f'Medía roc_auc: {resultadoss["test_roc_auc"].mean()}')
             #print(f'Accuracy: {accuracy_score(y_test, previsoes):.4f}%')
             #print(f'Matrix de confusão: {confusion_matrix(y_test, previsoes)}')
             #print(f'Precision score: {precision_score(y_test, previsoes)}')
@@ -160,6 +188,49 @@ class IAFinanceira:
             #print(f'F1 score: {f1_score(y_test, previsoes)}')
             #print(f'Classification report: {classification_report(y_test, previsoes)}')
             print('=' * 30)
+
+    def __testando_grid(self, x, y):
+        parametros = {
+            'n_estimators': [50, 100, 200],
+            'max_depth': [5, 10, 15]
+        }
+        x_treino, x_test, y_treino, y_test = train_test_split(x,
+                                                              y,
+                                                              test_size=0.2,
+                                                              random_state=42,
+                                                              stratify=y)
+
+        grid = GridSearchCV(
+            estimator=self.__modelo,
+            param_grid=parametros,
+            cv=5,
+            scoring='f1',
+            n_jobs=-1
+        )
+
+        grid.fit(x_treino, y_treino)
+
+        print(f'Melhores parametros: {grid.best_params_}')
+        print(f'Melhor f1: {grid.best_score_}')
+
+        #resultados_grid = pd.DataFrame(grid.cv_results_)
+        #print(resultados_grid[
+        #['param_n_estimators', 'param_max_depth', 'mean_test_score', 'std_test_score']].sort_values('mean_test_score',ascending=False))
+
+        melhor_modelo = grid.best_estimator_
+        previsoes = melhor_modelo.predict(x_test)
+        probabilidades = melhor_modelo.predict_proba(x_test)[:,1]
+        print(f'Accuracy {accuracy_score(y_test, previsoes)}')
+        print(f'Precision {precision_score(y_test, previsoes)}')
+        print(f'Recall {recall_score(y_test, previsoes)}')
+        print(f'F1 {f1_score(y_test, previsoes)}')
+        print(f'ROC-AUC {roc_auc_score(y_test, probabilidades)}')
+
+        print('Matriz confusion')
+        print(confusion_matrix(y_test, previsoes))
+
+        print('Classification report')
+        print(classification_report(y_test, previsoes))
 
     def __atualizar_treinamento_da_ia(self):
         self.__treinar_ia()
