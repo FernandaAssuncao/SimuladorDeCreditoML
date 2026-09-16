@@ -4,6 +4,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, recall_score, f1_score, classification_report, precision_recall_curve
 from sklearn.metrics import roc_curve, roc_auc_score
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
+from sklearn.inspection import permutation_importance
 import pandas as pd
 import joblib
 import matplotlib.pyplot as plt
@@ -111,7 +112,8 @@ class IAFinanceira:
         df_filtrado['cb_person_default_on_file'] = df_filtrado['cb_person_default_on_file'].map({'Y': 1, 'N': 0})
         x = df_filtrado[['person_age', 'person_income', 'loan_amnt', 'loan_percent_income', 'cb_person_default_on_file']]
         y = df_filtrado['loan_status']
-        self.__testando_grid(x, y)
+        #self.__testando_grid(x, y)
+        self.__testando_grid_threshold(x, y)
         x_treino, x_test, y_treino, y_test = train_test_split(x, y,
                                                               test_size=0.2,
                                                               random_state=42,
@@ -231,6 +233,126 @@ class IAFinanceira:
 
         print('Classification report')
         print(classification_report(y_test, previsoes))
+
+        for threshold in [0.5, 0.4, 0.3, 0.2, 0.1]:
+            previsoes_threshold = (probabilidades >= threshold).astype(int)
+            precision = precision_score(y_test, previsoes_threshold)
+            recall = recall_score(y_test, previsoes_threshold)
+            f1 = f1_score(y_test, previsoes_threshold)
+            print(f'Threshold: {threshold}')
+            print(f'Precision: {precision:.4f}')
+            print(f'Recall: {recall:.4f}')
+            print(f'F1: {f1:.4f}')
+
+    def __testando_grid_threshold(self, x, y):
+        parametros = {
+            'n_estimators': [50, 100, 200],
+            'max_depth': [5, 10, 15]
+        }
+
+        x_desenvolvimento, x_test, y_desenvolvimento, y_test = train_test_split(x,y,
+                                                                                test_size=0.2,
+                                                                                random_state=42,
+                                                                                stratify=y)
+
+        x_treino, x_validacao, y_treino, y_validacao = train_test_split(x_desenvolvimento,
+                                                                        y_desenvolvimento,
+                                                                        test_size=0.2,
+                                                                        random_state=42,
+                                                                        stratify=y_desenvolvimento)
+
+        grid = GridSearchCV(
+            estimator=self.__modelo,
+            param_grid=parametros,
+            cv=5,
+            scoring='f1',
+            n_jobs=-1
+        )
+        grid.fit(x_treino, y_treino)
+
+        print(f'Melhores parametros: {grid.best_params_}')
+        print(f'Melhor f1: {grid.best_score_}')
+
+        melhor_modelo = grid.best_estimator_
+
+        resultadoss = permutation_importance(
+            melhor_modelo,
+            x_test,
+            y_test,
+            scoring='f1',
+            n_repeats=10,
+            random_state=42,
+            n_jobs=-1
+        )
+
+        for colunaa, importanciaa in zip(x.columns, resultadoss.importances_mean):
+            print(f'{colunaa} : {importanciaa:.4f}')
+
+        importance = melhor_modelo.feature_importances_
+        for coluna, importancia in zip(x.columns, importance):
+            print(f'{coluna} : {importancia:.4f}')
+
+        probabilidades_validacao = melhor_modelo.predict_proba(x_validacao)[:,1]
+
+        melhor_threshold = 0
+        melhor_f1 = 0
+        for threshold in [0.50, 0.48, 0.46, 0.44, 0.42, 0.40,
+                  0.38, 0.36, 0.34, 0.32, 0.30]:
+            previsoes_validacao = (probabilidades_validacao >= threshold).astype(int)
+            precision_validacao = precision_score(y_validacao, previsoes_validacao)
+            recall_validacao = recall_score(y_validacao, previsoes_validacao)
+            f1_validacao = f1_score(y_validacao, previsoes_validacao)
+            matriz = confusion_matrix(
+                y_validacao,
+                previsoes_validacao
+            )
+            print(f'Threshold: {threshold}')
+            print(f'Precision: {precision_validacao:.4f}')
+            print(f'Recall: {recall_validacao:.4f}')
+            print(f'F1: {f1_validacao:.4f}')
+            print(f'Matriz:')
+            print(matriz)
+            tn, fp, fn, tp = matriz.ravel()
+
+            if fp <= 280 and f1_validacao > melhor_f1:
+                melhor_f1 = f1_validacao
+                melhor_threshold = threshold
+
+        print('=' * 30)
+        print(f'Melhor Threshold: {melhor_threshold}')
+        print(f'Melhor F1: {melhor_f1}')
+
+        probabilidades_teste = melhor_modelo.predict_proba(x_test)[:,1]
+
+        previsoes_teste = (probabilidades_teste >= melhor_threshold).astype(int)
+
+        accurracy = accuracy_score(y_test, previsoes_teste)
+
+        precision = precision_score(y_test, previsoes_teste)
+
+        recall = recall_score(y_test, previsoes_teste)
+
+        f1 = f1_score(y_test, previsoes_teste)
+
+        roc = roc_auc_score(y_test, probabilidades_teste)
+
+        print('\n==============================')
+        print('AVALIAÇÃO FINAL')
+        print('==============================')
+
+        print(f'Accuracy: {accurracy:.4f}')
+        print(f'Precision: {precision:.4f}')
+        print(f'Recall: {recall:.4f}')
+        print(f'F1: {f1:.4f}')
+        print(f'ROC-AUC: {roc:.4f}')
+
+        print('\nMatriz de confusão:')
+        print(confusion_matrix(y_test, previsoes_teste))
+
+        print('\nClassification Report:')
+        print(classification_report(y_test, previsoes_teste))
+
+
 
     def __atualizar_treinamento_da_ia(self):
         self.__treinar_ia()
