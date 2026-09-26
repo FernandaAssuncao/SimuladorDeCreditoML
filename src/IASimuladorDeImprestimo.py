@@ -352,8 +352,183 @@ class IAFinanceira:
         print('\nClassification Report:')
         print(classification_report(y_test, previsoes_teste))
 
+        resultado_teste = x_test.copy()
+        resultado_teste['real'] = y_test
+        resultado_teste['probabilidade_reprovado'] = probabilidades_teste
+        resultado_teste['previsto'] = previsoes_teste
 
+        falsos_positivos = resultado_teste[
+            (resultado_teste['real'] == 0) &  (resultado_teste['previsto'] == 1)]
+
+        falsos_negativos = resultado_teste[
+            (resultado_teste['real'] == 1) & (resultado_teste['previsto'] == 0)]
+        print(f'FP: {len(falsos_positivos)}')
+        print(f'FN: {len(falsos_negativos)}')
+
+        resultado_teste['tipo'] = np.select(
+            [
+                (resultado_teste['real'] == 0) & (resultado_teste['previsto'] == 0),
+                (resultado_teste['real'] == 0) & (resultado_teste['previsto'] == 1),
+                (resultado_teste['real'] == 1) & (resultado_teste['previsto'] == 0),
+                (resultado_teste['real'] == 1) & (resultado_teste['previsto'] == 1)
+            ],
+            [
+                'Verdadeiro Negativo',
+                'Falso Positivo',
+                'Falso Negativo',
+                'Verdadeiro Positivo'
+            ],
+            default = 'Outro'
+        )
+
+        print(resultado_teste['tipo'].value_counts())
+
+        print(
+            resultado_teste.groupby('tipo')[
+                [
+                    'person_age',
+                    'person_income',
+                    'loan_amnt',
+                    'loan_percent_income'
+                ]
+            ].agg(['mean', 'median']))
+
+        print(
+            resultado_teste.groupby('tipo')['probabilidade_reprovado'].agg(
+                ['mean', 'median', 'min', 'max']
+            )
+        )
+
+        pd.set_option('display.max_columns', None)
+
+        print(
+            resultado_teste[
+                resultado_teste['tipo'].isin([
+                    'Falso Positivo',
+                    'Verdadeiro Positivo'
+                ])
+            ].groupby('tipo')[
+                [
+                    'person_age',
+                    'person_income',
+                    'loan_amnt',
+                    'loan_percent_income',
+                    'cb_person_default_on_file'
+                ]
+            ].agg(['mean', 'median'])
+        )
+
+        print(
+            resultado_teste[
+                resultado_teste['tipo'].isin([
+                    'Falso Negativo',
+                    'Verdadeiro Negativo'
+                ])
+            ].groupby('tipo')[
+                [
+                    'person_age',
+                    'person_income',
+                    'loan_amnt',
+                    'loan_percent_income',
+                    'cb_person_default_on_file'
+                ]
+            ].agg(['mean', 'median'])
+        )
+
+        print('=' * 30)
+        grupos = [
+            'Verdadeiro Negativo',
+            'Falso Positivo',
+            'Falso Negativo',
+            'Verdadeiro Positivo'
+        ]
+
+        for grupo in grupos:
+            dados = resultado_teste[
+                resultado_teste['tipo'] == grupo
+                ]['loan_percent_income']
+
+            plt.hist(
+                dados,
+                bins=30,
+                alpha=0.5,
+                density=True,
+                label=grupo
+            )
+
+        plt.xlabel('Loan Percent Income')
+        plt.ylabel('Quantidade de clientes')
+        plt.title('Distribuição de Loan Percent Income por tipo de previsão')
+        plt.legend()
+        plt.show()
+
+        grupos = [
+            'Verdadeiro Negativo',
+            'Falso Positivo',
+            'Falso Negativo',
+            'Verdadeiro Positivo'
+        ]
+
+        for grupo in grupos:
+            dados = resultado_teste[
+                resultado_teste['tipo'] == grupo
+                ]['person_income']
+
+            plt.hist(
+                dados,
+                bins=30,
+                alpha=0.5,
+                density=True,
+                label=grupo
+            )
+
+        plt.xlabel('Person Income')
+        plt.ylabel('Densidade')
+        plt.title('Distribuição de Renda por tipo de previsão')
+        plt.legend()
+        plt.show()
+
+        print(
+            resultado_teste.groupby('tipo')['person_income'].agg(
+                ['mean', 'median', 'min', 'max']
+            )
+        )
+
+        print(
+            resultado_teste.groupby('tipo')['loan_amnt'].agg(
+                ['mean', 'median', 'min', 'max']
+            )
+        )
+
+        print(
+            pd.crosstab(
+                resultado_teste['tipo'],
+                resultado_teste['cb_person_default_on_file'],
+                normalize='index'
+            )
+        )
+
+        resultado_teste['faixa_loan_percent_income'] = pd.qcut(
+            resultado_teste['loan_percent_income'],
+            q=5,
+            duplicates='drop'
+        )
+
+        print(
+            pd.crosstab(
+                resultado_teste['faixa_loan_percent_income'],
+                resultado_teste['tipo']
+            ).reindex(
+                columns=[
+                    'Verdadeiro Negativo',
+                    'Falso Positivo',
+                    'Falso Negativo',
+                    'Verdadeiro Positivo'
+                ],
+                fill_value=0
+            ))
+
+        print('=' * 50)
 
     def __atualizar_treinamento_da_ia(self):
         self.__treinar_ia()
-
