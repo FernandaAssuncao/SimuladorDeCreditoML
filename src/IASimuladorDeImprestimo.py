@@ -530,5 +530,39 @@ class IAFinanceira:
 
         print('=' * 50)
 
+        faixa_alta = resultado_teste[
+            resultado_teste['loan_percent_income'] > 0.25
+            ]
+
+        print(
+            faixa_alta.groupby('tipo')[
+                [
+                    'person_income',
+                    'loan_amnt',
+                    'loan_percent_income',
+                    'cb_person_default_on_file'
+                ]
+            ].agg(['mean', 'median'])
+        )
+
+        print('=' * 50)
+
+        faixa_baixa = resultado_teste[
+            resultado_teste['loan_percent_income'] <= 0.25
+        ]
+
+        print(
+            faixa_baixa.groupby('tipo')[
+                [
+                    'person_income',
+                    'loan_amnt',
+                    'loan_percent_income',
+                    'cb_person_default_on_file'
+                ]
+            ].agg(['mean', 'median'])
+        )
+
+        print('=' * 50)
+
     def __atualizar_treinamento_da_ia(self):
         self.__treinar_ia()
