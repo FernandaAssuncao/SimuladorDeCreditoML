@@ -9,6 +9,9 @@ import pandas as pd
 import joblib
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OrdinalEncoder
 
 
 class IAFinanceira:
@@ -20,7 +23,7 @@ class IAFinanceira:
         self.__modelo = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
         self.__treinada = False
         self.verificar()
-        self.testar_modelo()
+        self.testar_pipeline()
 
     def __treinar_ia(self):
         df = pd.read_csv('data/credit_risk_dataset.csv')
@@ -566,3 +569,66 @@ class IAFinanceira:
 
     def __atualizar_treinamento_da_ia(self):
         self.__treinar_ia()
+
+    def testar_pipeline(self):
+        df = pd.read_csv('data/credit_risk_dataset.csv')
+
+        df = df[
+            self.colunas_x + ['loan_status']
+            ].dropna().copy()
+
+        x = df[self.colunas_x]
+        y = df['loan_status']
+
+        colunas_numericas = [
+            'person_age',
+            'person_income',
+            'loan_amnt',
+            'loan_percent_income'
+        ]
+
+        colunas_categoricas = [
+            'cb_person_default_on_file'
+        ]
+
+        preprocessador = ColumnTransformer(
+            transformers=[
+                (
+                    'categoricas',
+                    OrdinalEncoder(
+                        categories=[['N', 'Y']],
+                        handle_unknown='use_encoded_value',
+                        unknown_value=-1
+                    ),
+                    colunas_categoricas
+                )
+            ],
+            remainder='passthrough'
+        )
+
+        pipeline = Pipeline([
+            ('preprocessamento', preprocessador),
+            ('modelo', RandomForestClassifier(
+                n_estimators=100,
+                max_depth=10,
+                random_state=42
+            ))
+        ])
+
+        x_treino, x_test, y_treino, y_test = train_test_split(
+            x,
+            y,
+            test_size=0.2,
+            random_state=42,
+            stratify=y
+        )
+
+        pipeline.fit(x_treino, y_treino)
+
+        previsoes = pipeline.predict(x_test)
+
+        print('Matriz de confusão:')
+        print(confusion_matrix(y_test, previsoes))
+
+        print('\nRelatório de classificação:')
+        print(classification_report(y_test, previsoes))
