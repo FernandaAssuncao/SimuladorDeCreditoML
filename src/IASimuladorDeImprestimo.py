@@ -623,12 +623,36 @@ class IAFinanceira:
             stratify=y
         )
 
-        pipeline.fit(x_treino, y_treino)
+        parametros = {
+            'modelo__n_estimators': [100, 200],
+            'modelo__max_depth': [10, 20, None],
+            'modelo__min_samples_leaf': [1, 2]
+        }
 
-        previsoes = pipeline.predict(x_test)
+        busca = GridSearchCV(
+            estimator=pipeline,
+            param_grid=parametros,
+            scoring='recall',
+            cv=3,
+            n_jobs=-1,
+            verbose=1
+        )
 
-        print('Matriz de confusão:')
+        busca.fit(x_treino, y_treino)
+
+        melhor_pipeline = busca.best_estimator_
+
+        previsoes = melhor_pipeline.predict(x_test)
+
+        print('\nMelhores parâmetros:')
+        print(busca.best_params_)
+
+        print('\nMelhor recall médio na validação cruzada:')
+        print(busca.best_score_)
+
+        print('\nMatriz de confusão no conjunto de teste:')
         print(confusion_matrix(y_test, previsoes))
 
-        print('\nRelatório de classificação:')
+        print('\nRelatório de classificação no conjunto de teste:')
         print(classification_report(y_test, previsoes))
+
