@@ -23,7 +23,8 @@ class IAFinanceira:
         self.__modelo = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
         self.__treinada = False
         self.verificar()
-        self.testar_pipeline()
+        #self.testar_pipeline()
+        self.testar_threshold_pipeline()
 
     def __treinar_ia(self):
         df = pd.read_csv('data/credit_risk_dataset.csv')
@@ -656,3 +657,156 @@ class IAFinanceira:
         print('\nRelatório de classificação no conjunto de teste:')
         print(classification_report(y_test, previsoes))
 
+    def testar_threshold_pipeline(self):
+        df = pd.read_csv('data/credit_risk_dataset.csv')
+
+        df = df[
+            self.colunas_x + ['loan_status']
+            ].dropna().copy()
+
+        x = df[self.colunas_x]
+        y = df['loan_status']
+
+        # 1. Separar o teste antes de otimizar o modelo
+        x_temp, x_teste, y_temp, y_teste = train_test_split(
+            x, y,
+            test_size=0.20,
+            random_state=42,
+            stratify=y
+        )
+
+        # Separar treino e validação: 60% e 20% do total
+        x_treino, x_validacao, y_treino, y_validacao = (
+            train_test_split(
+                x_temp, y_temp,
+                test_size=0.25,
+                random_state=42,
+                stratify=y_temp
+            )
+        )
+
+        # 2. Criar o pré-processamento
+        preprocessador = ColumnTransformer(
+            transformers=[
+                (
+                    'categoricas',
+                    OrdinalEncoder(
+                        categories=[['N', 'Y']],
+                        handle_unknown='use_encoded_value',
+                        unknown_value=-1
+                    ),
+                    ['cb_person_default_on_file']
+                )
+            ],
+            remainder='passthrough'
+        )
+
+        pipeline = Pipeline([
+            ('preprocessamento', preprocessador),
+            ('modelo', RandomForestClassifier(
+                random_state=42
+            ))
+        ])
+
+        # 3. Otimizar os parâmetros usando apenas o treino
+        parametros = {
+            'modelo__n_estimators': [100, 200],
+            'modelo__max_depth': [10, 20, None],
+            'modelo__min_samples_leaf': [1, 2]
+        }
+
+        busca = GridSearchCV(
+            estimator=pipeline,
+            param_grid=parametros,
+            scoring='recall',
+            cv=3,
+            n_jobs=-1
+        )
+
+        busca.fit(x_treino, y_treino)
+        melhor_pipeline = busca.best_estimator_
+
+        # 4. Obter probabilidades na validação
+        probabilidades = melhor_pipeline.predict_proba(
+            x_validacao
+        )[:, 1]
+
+        limite_precisao = 0.65
+        resultados = []
+
+        print('\nResultados na validação:')
+
+        for threshold in [
+            0.25, 0.30, 0.34, 0.40, 0.45, 0.50, 0.55
+        ]:
+            previsoes = (
+                    probabilidades >= threshold
+            ).astype(int)
+
+            precisao = precision_score(
+                y_validacao, previsoes, zero_division=0
+            )
+            recall = recall_score(
+                y_validacao, previsoes, zero_division=0
+            )
+            f1 = f1_score(
+                y_validacao, previsoes, zero_division=0
+            )
+
+            resultados.append({
+                'threshold': threshold,
+                'precisao': precisao,
+                'recall': recall,
+                'f1': f1
+            })
+
+            print(
+                f'Threshold: {threshold:.2f} | '
+                f'Precisão: {precisao:.3f} | '
+                f'Recall: {recall:.3f} | '
+                f'F1: {f1:.3f}'
+            )
+
+        # 5. Escolher o maior recall entre os candidatos
+        # que atendem ao limite mínimo de precisão
+        elegiveis = [
+            r for r in resultados
+            if r['precisao'] >= limite_precisao
+        ]
+
+        if not elegiveis:
+            print(
+                '\nNenhum threshold testado atingiu '
+                f'precisão de {limite_precisao:.0%}.'
+            )
+            return
+
+        escolhido = max(
+            elegiveis,
+            key=lambda r: (r['recall'], r['precisao'])
+        )
+
+        threshold_escolhido = escolhido['threshold']
+
+        print('\nThreshold escolhido na validação:')
+        print(f"Threshold: {threshold_escolhido:.2f}")
+        print(f"Precisão: {escolhido['precisao']:.3f}")
+        print(f"Recall: {escolhido['recall']:.3f}")
+        print(f"F1: {escolhido['f1']:.3f}")
+
+        # 6. Avaliação final no teste, sem ajustar o threshold
+        probabilidades_teste = melhor_pipeline.predict_proba(
+            x_teste
+        )[:, 1]
+
+        previsoes_teste = (
+                probabilidades_teste >= threshold_escolhido
+        ).astype(int)
+
+        print('\nAvaliação final no teste:')
+        print(confusion_matrix(y_teste, previsoes_teste))
+        print(
+            classification_report(
+                y_teste, previsoes_teste, zero_division=0
+            )
+        )
