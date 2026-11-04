@@ -24,7 +24,8 @@ class IAFinanceira:
         self.__treinada = False
         self.verificar()
         #self.testar_pipeline()
-        self.testar_threshold_pipeline()
+        #self.testar_threshold_pipeline()
+        self.comparar_modelos()
 
     def __treinar_ia(self):
         df = pd.read_csv('data/credit_risk_dataset.csv')
@@ -810,3 +811,90 @@ class IAFinanceira:
                 y_teste, previsoes_teste, zero_division=0
             )
         )
+
+    def comparar_modelos(self):
+        df = pd.read_csv('data/credit_risk_dataset.csv')
+
+        df = df[
+            self.colunas_x + ['loan_status']
+            ].dropna().copy()
+
+        x = df[self.colunas_x]
+        y = df['loan_status']
+
+        x_treino, x_teste, y_treino, y_teste = train_test_split(
+            x, y,
+            test_size=0.2,
+            random_state=42,
+            stratify=y
+        )
+
+        x_teste_original = x_teste.copy()
+
+        x_teste_original['cb_person_default_on_file'] = (
+            x_teste_original['cb_person_default_on_file']
+            .map({'Y': 1, 'N': 0})
+        )
+
+        previsoes_original = self.__modelo.predict(x_teste_original)
+
+        print('\n===== MODELO ORIGINAL =====')
+
+        print('\nMatriz de confusão:')
+        print(confusion_matrix(y_teste, previsoes_original))
+
+        print('\nRelatório de classificação:')
+        print(classification_report(y_teste, previsoes_original))
+
+        processador = ColumnTransformer(
+            transformers=[
+                ('categorias',
+                 OrdinalEncoder(categories=[['N', 'Y']],
+                handle_unknown='use_encoded_value',
+                unknown_value=-1),
+                 ['cb_person_default_on_file']
+                 )
+            ],
+            remainder='passthrough'
+        )
+
+        pipeline = Pipeline([
+            ('processamento', processador),
+            ('modelo', RandomForestClassifier(random_state=42)),
+        ])
+
+        # Definir os parâmetros para testar
+        parametros = {
+            'modelo__n_estimators': [100, 200],
+            'modelo__max_depth': [10, 20, None],
+            'modelo__min_samples_leaf': [1, 2]
+        }
+
+        # Criar a busca pelos melhores parâmetros
+        busca = GridSearchCV(
+            pipeline,
+            parametros,
+            scoring='recall',
+            cv=3,
+            n_jobs=-1
+        )
+
+        # Treinar e encontrar o melhor modelo
+        busca.fit(x_treino, y_treino)
+
+        melhor_pipeline = busca.best_estimator_
+
+        # Avaliar o Pipeline otimizado
+        previsoes_pipeline = melhor_pipeline.predict(x_teste)
+
+        print('\n===== PIPELINE OTIMIZADO =====')
+
+        print('\nMelhores parâmetros:')
+        print(busca.best_params_)
+
+        print('\nMatriz de confusão:')
+        print(confusion_matrix(y_teste, previsoes_pipeline))
+
+        print('\nRelatório de classificação:')
+        print(classification_report(y_teste, previsoes_pipeline))
+
