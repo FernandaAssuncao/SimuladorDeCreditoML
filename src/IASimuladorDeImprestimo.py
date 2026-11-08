@@ -840,14 +840,6 @@ class IAFinanceira:
 
         print('\n===== MODELO ORIGINAL =====')
 
-        print(f'Accuracy: {accuracy_score(y_teste, previsoes_original):.2f}')
-
-        print(f'Presicion: {precision_score(y_teste, previsoes_original):.2f}')
-
-        print(f'Recall: {recall_score(y_teste, previsoes_original):.2f}')
-
-        print(f'F1-score {f1_score(y_teste, previsoes_original):.2f}')
-
         print('\nMatriz de confusão:')
         print(confusion_matrix(y_teste, previsoes_original))
 
@@ -905,4 +897,9 @@ class IAFinanceira:
 
         print('\nRelatório de classificação:')
         print(classification_report(y_teste, previsoes_pipeline))
+
+        probabilidades = melhor_pipeline.predict_proba(x_teste)[:,1]
+
+        print(f'\n=======PROBABILIDADE DOS CLIENTES=======')
+        print(probabilidades[:10])
 
