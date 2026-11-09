@@ -822,11 +822,20 @@ class IAFinanceira:
         x = df[self.colunas_x]
         y = df['loan_status']
 
-        x_treino, x_teste, y_treino, y_teste = train_test_split(
+        x_treino_validacao, x_teste, y_treino_validacao, y_teste = train_test_split(
             x, y,
             test_size=0.2,
             random_state=42,
             stratify=y
+        )
+
+        # Separar treino e validação
+        x_treino, x_validacao, y_treino, y_validacao = train_test_split(
+            x_treino_validacao,
+            y_treino_validacao,
+            test_size=0.25,
+            random_state=42,
+            stratify=y_treino_validacao
         )
 
         x_teste_original = x_teste.copy()
