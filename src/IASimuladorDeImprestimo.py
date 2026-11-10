@@ -893,6 +893,36 @@ class IAFinanceira:
 
         melhor_pipeline = busca.best_estimator_
 
+        probabilidades_validacao = melhor_pipeline.predict_proba(x_validacao)[:,1]
+
+        print('\n===== PROBABILIDADES DA VALIDAÇÃO =====')
+        print(probabilidades_validacao[:10])
+
+        thresholds = [0.25, 0.30, 0.34, 0.40, 0.45, 0.50, 0.55]
+
+        resultados = []
+
+        for threshold in thresholds:
+            previsoes = (
+                probabilidades_validacao >= threshold
+            ).astype(int)
+
+            precisao = precision_score(y_validacao, previsoes)
+            recall = recall_score(y_validacao, previsoes)
+            f1 = f1_score(y_validacao, previsoes)
+
+            resultados.append({
+                'threshold': threshold,
+                'precision': precisao,
+                'recall': recall,
+                'f1_score': f1
+            })
+
+        print('\n===== RESULTADOS DOS THRESHOLDS =====')
+
+        for resultado in resultados:
+            print(resultado)
+
         # Avaliar o Pipeline otimizado
         previsoes_pipeline = melhor_pipeline.predict(x_teste)
 
@@ -912,3 +942,24 @@ class IAFinanceira:
         print(f'\n=======PROBABILIDADE DOS CLIENTES=======')
         print(probabilidades[:10])
 
+        # Threshold escolhido na validação
+        melhor_threshold = 0.45
+
+        # Obter probabilidades do conjunto de teste
+        probabilidades_teste = melhor_pipeline.predict_proba(
+            x_teste
+        )[:, 1]
+
+        # Transformar probabilidades em classificações
+        previsoes_teste = (
+                probabilidades_teste >= melhor_threshold
+        ).astype(int)
+
+        # Avaliar o resultado final
+        print('\n===== AVALIAÇÃO FINAL =====')
+
+        print('\nMatriz de confusão:')
+        print(confusion_matrix(y_teste, previsoes_teste))
+
+        print('\nRelatório de classificação:')
+        print(classification_report(y_teste, previsoes_teste))
