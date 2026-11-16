@@ -869,7 +869,7 @@ class IAFinanceira:
 
         pipeline = Pipeline([
             ('processamento', processador),
-            ('modelo', RandomForestClassifier(random_state=42)),
+            ('modelo', RandomForestClassifier(random_state=42, class_weight='balanced')),
         ])
 
         # Definir os parâmetros para testar
@@ -891,14 +891,34 @@ class IAFinanceira:
         # Treinar e encontrar o melhor modelo
         busca.fit(x_treino, y_treino)
 
+        print('Melhores parâmetros:')
+        print(busca.best_params_)
+
+        print('Melhor Recall na validação cruzada:')
+        print(busca.best_score_)
+
         melhor_pipeline = busca.best_estimator_
 
         probabilidades_validacao = melhor_pipeline.predict_proba(x_validacao)[:,1]
 
+        # Fazer previsões com threshold padrão
+        previsoes_validacao = (
+                probabilidades_validacao >= 0.5
+        ).astype(int)
+
+        print('\n===== AVALIAÇÃO DO PIPELINE BALANCEADO =====')
+
+        print('\nMatriz de confusão:')
+        print(confusion_matrix(y_validacao, previsoes_validacao))
+
+        print('\nRelatório de classificação:')
+        print(classification_report(y_validacao, previsoes_validacao))
+
         print('\n===== PROBABILIDADES DA VALIDAÇÃO =====')
         print(probabilidades_validacao[:10])
 
-        thresholds = [0.25, 0.30, 0.34, 0.40, 0.45, 0.50, 0.55]
+        thresholds = [0.25, 0.30, 0.34, 0.40, 0.45, 0.50, 0.55,
+                      0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90]
 
         resultados = []
 
@@ -922,6 +942,26 @@ class IAFinanceira:
 
         for resultado in resultados:
             print(resultado)
+
+        candidatos = [
+            resultado for resultado in resultados
+            if resultado['precision'] >= 0.65
+        ]
+
+        if candidatos:
+            melhor_resultado = max(
+                candidatos,
+                key=lambda resultado: (
+                    resultado['recall'],
+                    resultado['precision']
+                )
+            )
+
+            print('\n===== MELHOR THRESHOLD =====')
+            print(melhor_resultado)
+
+        else:
+            print('\nNenhum threshold atingiu Precision de 65%.')
 
         # Avaliar o Pipeline otimizado
         previsoes_pipeline = melhor_pipeline.predict(x_teste)
