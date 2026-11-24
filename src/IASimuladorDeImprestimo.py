@@ -983,7 +983,7 @@ class IAFinanceira:
         print(probabilidades[:10])
 
         # Threshold escolhido na validação
-        melhor_threshold = 0.45
+        melhor_threshold = 0.60
 
         # Obter probabilidades do conjunto de teste
         probabilidades_teste = melhor_pipeline.predict_proba(
